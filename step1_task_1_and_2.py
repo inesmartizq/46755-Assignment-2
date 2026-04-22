@@ -109,42 +109,60 @@ def solve_two_price(scenarios, capacity=500):
     exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
     return q_opt, exp_profit, profits
 
-
-def plot_results(q1, q2, profits1, profits2, ep1, ep2, scenarios):
+def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label, color, linestyle="-"):
     hours = np.arange(1, 25)
     avg_wind = np.mean([s["wind"] for s in scenarios], axis=0)
 
-    plt.figure(figsize=(11, 4))
-    plt.step(hours, q1, where="mid", label="One-price", linewidth=2)
-    plt.step(hours, q2, where="mid", label="Two-price", linewidth=2, linestyle="--")
-    plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":")
+    plt.figure(figsize=(10, 4))
+    plt.step(hours, q, where="mid", label=offer_label, linewidth=2, color=color, linestyle=linestyle)
+    plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":", color="gray")
     plt.xlabel("Hour")
     plt.ylabel("MW")
-    plt.title("Optimal DA Offers — One-price vs Two-price")
+    plt.title(f"{task_name} - Optimal DA Offers")
     plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
-    plt.savefig("results/da_offers.png", dpi=150)
+    plt.savefig(f"results/{task_name.lower().replace('.', '_').replace(' ', '_')}_da_offers.png", dpi=150)
     plt.show()
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=False)
+    sorted_profits = np.sort(profits)
+    cumulative_profit = np.cumsum(sorted_profits)
 
-    items = [
-        (axes[0], profits1, ep1, "One-price"),
-        (axes[1], profits2, ep2, "Two-price"),
-    ]
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-    for ax, profits, ep, title in items:
-        color = "steelblue" if title == "One-price" else "darkorange"
-        ax.hist(profits, bins=50, color=color, edgecolor="white", alpha=0.85)
-        ax.axvline(ep, color="red", linestyle="--", linewidth=2, label=f"E[π] = {ep:,.0f} EUR")
-        ax.set_title(f"{title} profit distribution")
-        ax.set_xlabel("Daily profit (EUR)")
-        ax.set_ylabel("Scenarios")
-        ax.legend()
-        ax.grid(alpha=0.3)
+    axes[0].hist(profits, bins=50, color=color, edgecolor="white", alpha=0.85)
+    axes[0].axvline(exp_profit, color="red", linestyle="--", linewidth=2,
+                    label=f"E[profit] = {exp_profit:,.0f} EUR")
+    axes[0].set_title(f"{task_name} - Profit Distribution")
+    axes[0].set_xlabel("Profit (EUR)")
+    axes[0].set_ylabel("Frequency")
+    axes[0].legend()
+    axes[0].grid(alpha=0.3)
 
-    plt.suptitle("Profit Distribution — 1,600 Scenarios")
+    axes[1].plot(np.arange(1, len(sorted_profits) + 1), cumulative_profit, color=color, linewidth=1.8)
+    axes[1].set_title(f"{task_name} - Cumulative Profit")
+    axes[1].set_xlabel("Scenario")
+    axes[1].set_ylabel("Cumulative Profit (EUR)")
+    axes[1].grid(alpha=0.3)
+
     plt.tight_layout()
-    plt.savefig("results/profit_distributions.png", dpi=150)
+    plt.savefig(f"results/{task_name.lower().replace('.', '_').replace(' ', '_')}_profit_analysis.png", dpi=150)
+    plt.show()
+
+
+def plot_offer_comparison(q1, q2, scenarios):
+    hours = np.arange(1, 25)
+    avg_wind = np.mean([s["wind"] for s in scenarios], axis=0)
+
+    plt.figure(figsize=(10, 4))
+    plt.step(hours, q1, where="mid", label="Task 1.1", linewidth=2, color="steelblue")
+    plt.step(hours, q2, where="mid", label="Task 1.2", linewidth=2, linestyle="--", color="darkorange")
+    plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":", color="gray")
+    plt.xlabel("Hour")
+    plt.ylabel("MW")
+    plt.title("DA Offer Comparison")
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig("results/da_offers_comparison.png", dpi=150)
     plt.show()

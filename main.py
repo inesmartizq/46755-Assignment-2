@@ -1,5 +1,5 @@
 from step1_scenario_generation import dataframe_building, generate_combined_scenarios
-from step1_task_1_and_2 import solve_one_price, solve_two_price, plot_results
+from step1_task_1_and_2 import solve_one_price, solve_two_price, plot_task_results, plot_offer_comparison
 
 df = dataframe_building(
     price_file="data/energy_prices.csv",
@@ -20,4 +20,6 @@ q2, ep2, profits2 = solve_two_price(scenarios)
 print(f"\nTwo-price  |  E[profit] = {ep2:,.2f} EUR")
 print(f"Offers (MW): {q2.round(1)}")
 
-plot_results(q1, q2, profits1, profits2, ep1, ep2, scenarios)
+plot_task_results(q1, profits1, ep1, scenarios, "Task 1.1", "One-price offer", "steelblue")
+plot_task_results(q2, profits2, ep2, scenarios, "Task 1.2", "Two-price offer", "darkorange", "--")
+plot_offer_comparison(q1, q2, scenarios)
