@@ -118,7 +118,68 @@ def run_cross_validation(all_scenarios, n_folds=8):
 
     return results
 
+def run_cross_validation_vary_is(all_scenarios, is_sizes=None, n_folds=8):
+    """
+    Run 8-fold cross-validation for different in-sample sizes.
+    Total scenarios stay at 1,600; only the IS/OOS split changes.
+    
+    Returns a dict keyed by IS size, each containing per-fold IS and OOS
+    profits for both schemes.
+    """
+    if is_sizes is None:
+        is_sizes = [25, 50, 100, 200, 400, 600, 800, 1000, 1200, 1400]
 
+    N_TOTAL = len(all_scenarios)
+    all_results = {}
+
+    for is_size in is_sizes:
+        fold_size = is_size // n_folds
+        if fold_size == 0:
+            print(f"Skipping IS={is_size}: too small for {n_folds} folds.")
+            continue
+
+        n_oos = N_TOTAL - fold_size
+        print(f"\n{'='*60}")
+        print(f"IS size: {is_size} | Fold size: {fold_size} | OOS size: {n_oos}")
+        print(f"{'='*60}")
+
+        is_one, oos_one = [], []
+        is_two, oos_two = [], []
+
+        for fold in range(n_folds):
+            start = fold * fold_size
+            end   = start + fold_size
+
+            raw_in  = all_scenarios[start:end]
+            raw_oos = all_scenarios[:start] + all_scenarios[end:]
+
+            in_sample  = set_equal_probs(raw_in)
+            out_sample = set_equal_probs(raw_oos)
+
+            q1, ep1_is, _ = solve_one_price(in_sample)
+            _, ep1_oos     = compute_one_price_profits(q1, out_sample)
+            is_one.append(ep1_is)
+            oos_one.append(ep1_oos)
+
+            q2, ep2_is, _ = solve_two_price(in_sample)
+            _, ep2_oos     = compute_two_price_profits(q2, out_sample)
+            is_two.append(ep2_is)
+            oos_two.append(ep2_oos)
+
+            print(f"  Fold {fold+1}/{n_folds} | "
+                  f"1P IS: {ep1_is:>10,.0f} OOS: {ep1_oos:>10,.0f} | "
+                  f"2P IS: {ep2_is:>10,.0f} OOS: {ep2_oos:>10,.0f}")
+
+        all_results[is_size] = {
+            "is_one":  is_one,
+            "oos_one": oos_one,
+            "is_two":  is_two,
+            "oos_two": oos_two,
+        }
+
+    return all_results
+
+    
 # ---------------------------------------------------------------------------
 # Plot functions (callable from main)
 # ---------------------------------------------------------------------------
@@ -206,4 +267,76 @@ def plot_cv_avg_comparison(results):
     ax.grid(axis="y", alpha=0.3)
     plt.tight_layout()
     plt.savefig("results/task_1_3_avg_comparison.png", dpi=150)
+    plt.show()
+
+
+
+def plot_vary_is_line(all_results):
+    """
+    Line plot of averaged OOS (and IS) profit vs in-sample size,
+    for both one-price and two-price schemes.
+    """
+    is_sizes = sorted(all_results.keys())
+
+    avg_is_one  = [np.mean(all_results[k]["is_one"])  for k in is_sizes]
+    avg_oos_one = [np.mean(all_results[k]["oos_one"]) for k in is_sizes]
+    avg_is_two  = [np.mean(all_results[k]["is_two"])  for k in is_sizes]
+    avg_oos_two = [np.mean(all_results[k]["oos_two"]) for k in is_sizes]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    ax.plot(is_sizes, avg_is_one,  marker="o", color="steelblue",
+            linewidth=2, label="One-price IS")
+    ax.plot(is_sizes, avg_oos_one, marker="o", color="steelblue",
+            linewidth=2, linestyle="--", label="One-price OOS")
+    ax.plot(is_sizes, avg_is_two,  marker="s", color="darkorange",
+            linewidth=2, label="Two-price IS")
+    ax.plot(is_sizes, avg_oos_two, marker="s", color="darkorange",
+            linewidth=2, linestyle="--", label="Two-price OOS")
+
+    ax.set_xlabel("In-sample size")
+    ax.set_ylabel("Avg Expected Profit (EUR)")
+    ax.set_title("Task 1.3 – Avg IS vs OOS Profit across In-sample Sizes\n(8-Fold CV, Total = 1,600 scenarios)")
+    ax.set_xticks(is_sizes)
+    ax.legend()
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig("results/task_1_3_vary_is_line.png", dpi=150)
+    plt.show()
+
+
+def plot_vary_is_boxplot(all_results):
+    """
+    Box plot of per-fold OOS profits across in-sample sizes,
+    for both one-price and two-price schemes side by side.
+    """
+    is_sizes = sorted(all_results.keys())
+
+    oos_one_data = [all_results[k]["oos_one"] for k in is_sizes]
+    oos_two_data = [all_results[k]["oos_two"] for k in is_sizes]
+
+    x = np.arange(len(is_sizes))
+    width = 0.3
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    bp1 = ax.boxplot(oos_one_data, positions=x - width/2, widths=0.25,
+                     patch_artist=True,
+                     boxprops=dict(facecolor="steelblue", alpha=0.7),
+                     medianprops=dict(color="black", linewidth=2))
+
+    bp2 = ax.boxplot(oos_two_data, positions=x + width/2, widths=0.25,
+                     patch_artist=True,
+                     boxprops=dict(facecolor="darkorange", alpha=0.7),
+                     medianprops=dict(color="black", linewidth=2))
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(is_sizes)
+    ax.set_xlabel("In-sample size")
+    ax.set_ylabel("OOS Expected Profit (EUR)")
+    ax.set_title("Task 1.3 – OOS Profit Distribution across In-sample Sizes\n(8-Fold CV, per-fold values)")
+    ax.legend([bp1["boxes"][0], bp2["boxes"][0]], ["One-price", "Two-price"])
+    ax.grid(axis="y", alpha=0.3)
+    plt.tight_layout()
+    plt.savefig("results/task_1_3_vary_is_boxplot.png", dpi=150)
     plt.show()
