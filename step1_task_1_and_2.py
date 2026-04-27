@@ -43,42 +43,42 @@ def solve_one_price(scenarios, capacity=500):
 
 # For the two-price scenario we have: 
 def solve_two_price(scenarios, capacity=500):
-    T = 24 #number of hours
-    S = len(scenarios) #number of scenarios
-    prob = scenarios[0]["prob"] # Assuming all scenarios have the same probability, we can take it from the first one.
+    T = 24
+    S = len(scenarios)
+    prob = scenarios[0]["prob"]
 
     m = gp.Model("two_price")
     m.setParam("OutputFlag", 0)
 
-    q = m.addVars(T, lb=0, ub=capacity, name="q") #DA offers for each hour
-    dev_plus = m.addVars(S, T, lb=0, ub=capacity, name="dev_plus") #Positive deviations (wind > DA offer)
-    dev_minus = m.addVars(S, T, lb=0, ub=capacity, name="dev_minus") #Negative deviations (wind < DA offer)
-    z = m.addVars(S, T, vtype=GRB.BINARY, name="z") #Binary AUXILIARY variable to indicate if we are in a positive or negative deviation scenario
+    q = m.addVars(T, lb=0, ub=capacity, name="q")
+    dev_plus = m.addVars(S, T, lb=0, ub=capacity, name="dev_plus")
+    dev_minus = m.addVars(S, T, lb=0, ub=capacity, name="dev_minus")
+    z = m.addVars(S, T, vtype=GRB.BINARY, name="z")
 
     for s, scen in enumerate(scenarios):
         for t in range(T):
-            m.addConstr(dev_plus[s, t] - dev_minus[s, t] == scen["wind"][t] - q[t]) #Deviation definition: dev_plus - dev_minus = actual wind - DA offer
-            m.addConstr(dev_plus[s, t] <= capacity * z[s, t]) #If z[s, t] = 0, then dev_plus[s, t] must be 0 (no positive deviation)
-            m.addConstr(dev_minus[s, t] <= capacity * (1 - z[s, t])) #If z[s, t] = 1, then dev_minus[s, t] must be 0 (no negative deviation)
+            m.addConstr(dev_plus[s, t] - dev_minus[s, t] == scen["wind"][t] - q[t])
+            m.addConstr(dev_plus[s, t] <= capacity * z[s, t])
+            m.addConstr(dev_minus[s, t] <= capacity * (1 - z[s, t]))
 
     obj = gp.LinExpr()
 
     for s, scen in enumerate(scenarios):
         for t in range(T):
-            obj += prob * scen["price"][t] * q[t] #Revenue from DA offers
+            obj += prob * scen["price"][t] * q[t]
 
     for s, scen in enumerate(scenarios):
         for t in range(T):
-            da = float(scen["price"][t])   #DA price for scenario s at time t
-            bp = float(scen["bp"][t])      #Balancing price for scenario s at time t
-            si = int(scen["imbalance"][t]) #Imbalance indicator for scenario s at time t (1 if positive imbalance, 0 if negative imbalance)
+            da = float(scen["price"][t])
+            bp = float(scen["bp"][t])
+            si = int(scen["imbalance"][t])
 
             if si == 1:
-                obj += prob * da * dev_plus[s, t]  #Revenue from positive deviations (wind > DA offer) at DA price
-                obj -= prob * bp * dev_minus[s, t] #Cost from negative deviations (wind < DA offer) at balancing price
+                obj += prob * da * dev_plus[s, t]
+                obj -= prob * bp * dev_minus[s, t]
             else:
-                obj += prob * bp * dev_plus[s, t]  #Revenue from positive deviations (wind > DA offer) at balancing price
-                obj -= prob * da * dev_minus[s, t] #Cost from negative deviations (wind < DA offer) at DA price
+                obj += prob * bp * dev_plus[s, t]
+                obj -= prob * da * dev_minus[s, t]
 
     m.setObjective(obj, GRB.MAXIMIZE)
     m.optimize()
@@ -108,14 +108,29 @@ def solve_two_price(scenarios, capacity=500):
 
     exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
     return q_opt, exp_profit, profits
+def get_wind_stats(scenarios):
+    wind_data = np.array([s["wind"] for s in scenarios])
+
+    avg_wind = np.mean(wind_data, axis=0)
+    std_wind = np.std(wind_data, axis=0)
+    wind_min = np.min(wind_data, axis=0)
+    wind_max = np.max(wind_data, axis=0)
+
+    return avg_wind, std_wind, wind_min, wind_max
+
 
 def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label, color, linestyle="-"):
     hours = np.arange(1, 25)
-    avg_wind = np.mean([s["wind"] for s in scenarios], axis=0)
+    avg_wind, std_wind, wind_min, wind_max = get_wind_stats(scenarios)
 
     plt.figure(figsize=(10, 4))
-    plt.step(hours, q, where="mid", label=offer_label, linewidth=2, color=color, linestyle=linestyle)
+
+    plt.fill_between(hours, wind_min, wind_max, step="mid", color="gray", alpha=0.10, label="Wind min-max")
+    plt.fill_between(hours, avg_wind - std_wind, avg_wind + std_wind,
+                     step="mid", color="gray", alpha=0.20, label="Wind mean ± std")
     plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":", color="gray")
+    plt.step(hours, q, where="mid", label=offer_label, linewidth=2, color=color, linestyle=linestyle)
+
     plt.xlabel("Hour")
     plt.ylabel("MW")
     plt.title(f"{task_name} - Optimal DA Offers")
@@ -135,7 +150,7 @@ def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label,
                     label=f"E[profit] = {exp_profit:,.0f} EUR")
     axes[0].set_title(f"{task_name} - Profit Distribution")
     axes[0].set_xlabel("Profit (EUR)")
-    axes[0].set_ylabel("Frequency")
+    axes[0].set_ylabel("Number of scenarios")
     axes[0].legend()
     axes[0].grid(alpha=0.3)
 
@@ -152,12 +167,18 @@ def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label,
 
 def plot_offer_comparison(q1, q2, scenarios):
     hours = np.arange(1, 25)
-    avg_wind = np.mean([s["wind"] for s in scenarios], axis=0)
+    avg_wind, std_wind, wind_min, wind_max = get_wind_stats(scenarios)
 
     plt.figure(figsize=(10, 4))
+
+    plt.fill_between(hours, wind_min, wind_max, step="mid", color="gray", alpha=0.10, label="Wind min-max")
+    plt.fill_between(hours, avg_wind - std_wind, avg_wind + std_wind,
+                     step="mid", color="gray", alpha=0.20, label="Wind mean ± std")
+    plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":", color="gray")
+
     plt.step(hours, q1, where="mid", label="Task 1.1", linewidth=2, color="steelblue")
     plt.step(hours, q2, where="mid", label="Task 1.2", linewidth=2, linestyle="--", color="darkorange")
-    plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":", color="gray")
+
     plt.xlabel("Hour")
     plt.ylabel("MW")
     plt.title("DA Offer Comparison")
