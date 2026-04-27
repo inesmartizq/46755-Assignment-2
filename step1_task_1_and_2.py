@@ -150,7 +150,7 @@ def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label,
                     label=f"E[profit] = {exp_profit:,.0f} EUR")
     axes[0].set_title(f"{task_name} - Profit Distribution")
     axes[0].set_xlabel("Profit (EUR)")
-    axes[0].set_ylabel("Frequency")
+    axes[0].set_ylabel("Number of scenarios")
     axes[0].legend()
     axes[0].grid(alpha=0.3)
 
