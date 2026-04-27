@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import gurobipy as gp
 from gurobipy import GRB
 
@@ -195,6 +196,48 @@ def validate_solution(reserve_bid, flexibility, method_name):
     print("Target shortfall <= 0.10")
 
 
+
+def plot_task_21(flexibility, reserve_alsox, reserve_cvar):
+    """
+    Visualizes the flexibility distribution and where the bids fall.
+    """
+    # Flatten flexibility to get the distribution of all 6000 points (100 scenarios * 60 mins)
+    flat_flex = flexibility.flatten()
+    flat_flex_sorted = np.sort(flat_flex)
+    
+    # Calculate CDF
+    p = np.linspace(0, 1, len(flat_flex_sorted))
+
+    plt.figure(figsize=(10, 6))
+    
+    # Plot CDF of flexibility
+    plt.plot(flat_flex_sorted, p, label='In-sample Flexibility (CDF)', color='black', linewidth=2)
+    
+    # Add vertical lines for the bids
+    plt.axvline(x=reserve_alsox, color='blue', linestyle='--', label=f'ALSO-X Bid: {reserve_alsox:.2f} kW')
+    plt.axvline(x=reserve_cvar, color='red', linestyle='--', label=f'CVaR Bid: {reserve_cvar:.2f} kW')
+    
+    # Highlight the 10% (P90) threshold
+    plt.axhline(y=0.10, color='gray', linestyle=':', label='10% Violation Threshold (P90)')
+
+    plt.title('Task 2.1: Reserve Bid Comparison vs. Flexibility Distribution')
+    plt.xlabel('Available Upward Flexibility (kW)')
+    plt.ylabel('Cumulative Probability')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    # Save the plot for the report
+    plt.savefig("data/task2_1_visualization.png")
+    print("\nVisualization saved to data/task2_1_visualization.png")
+    
+    # Show the plot
+    plt.show()
+    
+    
+
+
+
+
 # =========================================================
 # TASK 2.2
 # OUT-OF-SAMPLE VERIFICATION
@@ -263,6 +306,37 @@ def verify_p90_out_of_sample(reserve_bid, profiles, method_name):
         "max_shortfall": max_shortfall,
         "scenario_success_rate": scenario_success_rate
     }
+
+
+
+def plot_task_22(out_profiles, reserve_alsox, reserve_cvar):
+    """
+    Visualizes the shortfall magnitude for Task 2.2 (Out-of-sample).
+    """
+    out_flex = compute_flexibility(out_profiles)
+    
+    # Calculate shortfall: max(0, Bid - Actual Flexibility)
+    shortfall_alsox = np.maximum(0, reserve_alsox - out_flex).flatten()
+    shortfall_cvar = np.maximum(0, reserve_cvar - out_flex).flatten()
+
+    plt.figure(figsize=(10, 6))
+    
+    # We only care about plotting actual shortfall events (shortfall > 0)
+    plt.hist(shortfall_alsox[shortfall_alsox > 0], bins=30, alpha=0.5, 
+             label=f'ALSO-X Shortfalls (Mean: {np.mean(shortfall_alsox):.2f} kW)', color='blue')
+    plt.hist(shortfall_cvar[shortfall_cvar > 0], bins=30, alpha=0.5, 
+             label=f'CVaR Shortfalls (Mean: {np.mean(shortfall_cvar):.2f} kW)', color='red')
+
+    plt.title('Task 2.2: Distribution of Out-of-Sample Shortfall Magnitudes')
+    plt.xlabel('Shortfall Amount (kW)')
+    plt.ylabel('Frequency (Minutes)')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    plt.savefig("data/task2_2_shortfalls.png")
+    plt.show()
+    print("\nVisualization saved to data/task2_2_shortfalls.png")
+
 
 
 # =========================================================
@@ -358,6 +432,47 @@ def task_23_sensitivity_analysis(in_profiles, out_profiles):
     return results_df
 
 
+
+def plot_task_23(results_df):
+    """
+    Visualizes the trade-off between P-requirement, Reserve Bid, and Shortfall.
+    """
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # Plotting the Reserve Bid (Primary Y-axis)
+    color = 'tab:blue'
+    ax1.set_xlabel('P-Requirement (Reliability Level)')
+    ax1.set_ylabel('Optimal Reserve Bid (kW)', color=color, fontweight='bold')
+    ax1.plot(results_df['P_requirement'], results_df['Reserve_Bid_kW'], 
+             marker='o', color=color, linewidth=2, label='Reserve Bid')
+    ax1.tick_params(axis='y', labelcolor=color)
+
+    # Creating a second Y-axis for the Expected Shortfall
+    ax2 = ax1.twinx()
+    color = 'tab:red'
+    ax2.set_ylabel('Expected Shortfall (kW)', color=color, fontweight='bold')
+    ax2.plot(results_df['P_requirement'], results_df['Expected_Shortfall_kW'], 
+             marker='s', color=color, linewidth=2, linestyle='--', label='Exp. Shortfall')
+    ax2.tick_params(axis='y', labelcolor=color)
+
+    # Formatting
+    plt.title('Task 2.3: Reliability vs. Reserve Capacity Trade-off')
+    ax1.grid(True, alpha=0.3)
+    
+    # Combined legend
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax2.legend(lines + lines2, labels + labels2, loc='upper right')
+
+    plt.tight_layout()
+    plt.savefig("data/task2_3_sensitivity.png")
+    plt.show()
+    print("\nVisualization saved to data/task2_3_sensitivity.png")
+
+
+
+
+
 # =========================================================
 # MAIN
 # =========================================================
@@ -425,6 +540,14 @@ if __name__ == "__main__":
         print("\nCheck formulation:")
         print("CVaR should usually be more conservative.")
 
+    if reserve_cvar <= reserve_alsox:
+        print("\nAs expected: CVaR is more conservative than ALSO-X.")
+    else:
+        print("\nCheck formulation: CVaR should usually be more conservative.")
+
+    plot_task_21(flexibility, reserve_alsox, reserve_cvar)
+
+
     # =====================================================
     # TASK 2.2
     # =====================================================
@@ -452,6 +575,9 @@ if __name__ == "__main__":
         "CVaR"
     )
 
+    plot_task_22(out_profiles, reserve_alsox, reserve_cvar)
+
+
     # =====================================================
     # TASK 2.3
     # =====================================================
@@ -460,3 +586,14 @@ if __name__ == "__main__":
         profiles,
         out_profiles
     )
+
+    # Run Task 2.3 analysis
+    results_df = task_23_sensitivity_analysis(
+        profiles,
+        out_profiles
+    )
+
+    plot_task_23(results_df)
+
+
+
