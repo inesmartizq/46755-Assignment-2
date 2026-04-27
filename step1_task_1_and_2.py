@@ -43,42 +43,42 @@ def solve_one_price(scenarios, capacity=500):
 
 # For the two-price scenario we have: 
 def solve_two_price(scenarios, capacity=500):
-    T = 24
-    S = len(scenarios)
-    prob = scenarios[0]["prob"]
+    T = 24 #number of hours
+    S = len(scenarios) #number of scenarios
+    prob = scenarios[0]["prob"] # Assuming all scenarios have the same probability, we can take it from the first one.
 
     m = gp.Model("two_price")
     m.setParam("OutputFlag", 0)
 
-    q = m.addVars(T, lb=0, ub=capacity, name="q")
-    dev_plus = m.addVars(S, T, lb=0, ub=capacity, name="dev_plus")
-    dev_minus = m.addVars(S, T, lb=0, ub=capacity, name="dev_minus")
-    z = m.addVars(S, T, vtype=GRB.BINARY, name="z")
+    q = m.addVars(T, lb=0, ub=capacity, name="q") #DA offers for each hour
+    dev_plus = m.addVars(S, T, lb=0, ub=capacity, name="dev_plus") #Positive deviations (wind > DA offer)
+    dev_minus = m.addVars(S, T, lb=0, ub=capacity, name="dev_minus") #Negative deviations (wind < DA offer)
+    z = m.addVars(S, T, vtype=GRB.BINARY, name="z") #Binary AUXILIARY variable to indicate if we are in a positive or negative deviation scenario
 
     for s, scen in enumerate(scenarios):
         for t in range(T):
-            m.addConstr(dev_plus[s, t] - dev_minus[s, t] == scen["wind"][t] - q[t])
-            m.addConstr(dev_plus[s, t] <= capacity * z[s, t])
-            m.addConstr(dev_minus[s, t] <= capacity * (1 - z[s, t]))
+            m.addConstr(dev_plus[s, t] - dev_minus[s, t] == scen["wind"][t] - q[t]) #Deviation definition: dev_plus - dev_minus = actual wind - DA offer
+            m.addConstr(dev_plus[s, t] <= capacity * z[s, t]) #If z[s, t] = 0, then dev_plus[s, t] must be 0 (no positive deviation)
+            m.addConstr(dev_minus[s, t] <= capacity * (1 - z[s, t])) #If z[s, t] = 1, then dev_minus[s, t] must be 0 (no negative deviation)
 
     obj = gp.LinExpr()
 
     for s, scen in enumerate(scenarios):
         for t in range(T):
-            obj += prob * scen["price"][t] * q[t]
+            obj += prob * scen["price"][t] * q[t] #Revenue from DA offers
 
     for s, scen in enumerate(scenarios):
         for t in range(T):
-            da = float(scen["price"][t])
-            bp = float(scen["bp"][t])
-            si = int(scen["imbalance"][t])
+            da = float(scen["price"][t])   #DA price for scenario s at time t
+            bp = float(scen["bp"][t])      #Balancing price for scenario s at time t
+            si = int(scen["imbalance"][t]) #Imbalance indicator for scenario s at time t (1 if positive imbalance, 0 if negative imbalance)
 
             if si == 1:
-                obj += prob * da * dev_plus[s, t]
-                obj -= prob * bp * dev_minus[s, t]
+                obj += prob * da * dev_plus[s, t]  #Revenue from positive deviations (wind > DA offer) at DA price
+                obj -= prob * bp * dev_minus[s, t] #Cost from negative deviations (wind < DA offer) at balancing price
             else:
-                obj += prob * bp * dev_plus[s, t]
-                obj -= prob * da * dev_minus[s, t]
+                obj += prob * bp * dev_plus[s, t]  #Revenue from positive deviations (wind > DA offer) at balancing price
+                obj -= prob * da * dev_minus[s, t] #Cost from negative deviations (wind < DA offer) at DA price
 
     m.setObjective(obj, GRB.MAXIMIZE)
     m.optimize()
