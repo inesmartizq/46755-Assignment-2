@@ -108,14 +108,29 @@ def solve_two_price(scenarios, capacity=500):
 
     exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
     return q_opt, exp_profit, profits
+def get_wind_stats(scenarios):
+    wind_data = np.array([s["wind"] for s in scenarios])
+
+    avg_wind = np.mean(wind_data, axis=0)
+    std_wind = np.std(wind_data, axis=0)
+    wind_min = np.min(wind_data, axis=0)
+    wind_max = np.max(wind_data, axis=0)
+
+    return avg_wind, std_wind, wind_min, wind_max
+
 
 def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label, color, linestyle="-"):
     hours = np.arange(1, 25)
-    avg_wind = np.mean([s["wind"] for s in scenarios], axis=0)
+    avg_wind, std_wind, wind_min, wind_max = get_wind_stats(scenarios)
 
     plt.figure(figsize=(10, 4))
-    plt.step(hours, q, where="mid", label=offer_label, linewidth=2, color=color, linestyle=linestyle)
+
+    plt.fill_between(hours, wind_min, wind_max, step="mid", color="gray", alpha=0.10, label="Wind min-max")
+    plt.fill_between(hours, avg_wind - std_wind, avg_wind + std_wind,
+                     step="mid", color="gray", alpha=0.20, label="Wind mean ± std")
     plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":", color="gray")
+    plt.step(hours, q, where="mid", label=offer_label, linewidth=2, color=color, linestyle=linestyle)
+
     plt.xlabel("Hour")
     plt.ylabel("MW")
     plt.title(f"{task_name} - Optimal DA Offers")
@@ -152,12 +167,18 @@ def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label,
 
 def plot_offer_comparison(q1, q2, scenarios):
     hours = np.arange(1, 25)
-    avg_wind = np.mean([s["wind"] for s in scenarios], axis=0)
+    avg_wind, std_wind, wind_min, wind_max = get_wind_stats(scenarios)
 
     plt.figure(figsize=(10, 4))
+
+    plt.fill_between(hours, wind_min, wind_max, step="mid", color="gray", alpha=0.10, label="Wind min-max")
+    plt.fill_between(hours, avg_wind - std_wind, avg_wind + std_wind,
+                     step="mid", color="gray", alpha=0.20, label="Wind mean ± std")
+    plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":", color="gray")
+
     plt.step(hours, q1, where="mid", label="Task 1.1", linewidth=2, color="steelblue")
     plt.step(hours, q2, where="mid", label="Task 1.2", linewidth=2, linestyle="--", color="darkorange")
-    plt.step(hours, avg_wind, where="mid", label="Avg wind", linewidth=1.5, linestyle=":", color="gray")
+
     plt.xlabel("Hour")
     plt.ylabel("MW")
     plt.title("DA Offer Comparison")
