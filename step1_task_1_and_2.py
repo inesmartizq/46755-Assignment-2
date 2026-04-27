@@ -187,3 +187,38 @@ def plot_offer_comparison(q1, q2, scenarios):
     plt.tight_layout()
     plt.savefig("results/da_offers_comparison.png", dpi=150)
     plt.show()
+    
+def plot_profit_comparison(profits1, profits2):
+    sorted_1 = np.sort(profits1)
+    sorted_2 = np.sort(profits2)
+
+    cum_1 = np.cumsum(sorted_1)
+    cum_2 = np.cumsum(sorted_2)
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+
+    # Same bins for fair comparison
+    all_profits = np.concatenate([profits1, profits2])
+    bins = np.linspace(all_profits.min(), all_profits.max(), 40)
+
+    # Distribution comparison
+    axes[0].hist(profits1, bins=bins, alpha=0.6, color="steelblue", edgecolor="white", label="Task 1.1")
+    axes[0].hist(profits2, bins=bins, alpha=0.6, color="darkorange", edgecolor="white", label="Task 1.2")
+    axes[0].set_title("Profit Distribution Comparison")
+    axes[0].set_xlabel("Profit (EUR)")
+    axes[0].set_ylabel("Frequency")
+    axes[0].legend()
+    axes[0].grid(alpha=0.3)
+
+    # Cumulative comparison
+    axes[1].plot(np.arange(1, len(sorted_1) + 1), cum_1, linewidth=2, color="steelblue", label="Task 1.1")
+    axes[1].plot(np.arange(1, len(sorted_2) + 1), cum_2, linewidth=2, color="darkorange", linestyle="--", label="Task 1.2")
+    axes[1].set_title("Cumulative Profit Comparison")
+    axes[1].set_xlabel("Scenario")
+    axes[1].set_ylabel("Cumulative Profit (EUR)")
+    axes[1].legend()
+    axes[1].grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig("results/profit_comparison.png", dpi=150)
+    plt.show()
