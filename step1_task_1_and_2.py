@@ -6,7 +6,40 @@ from gurobipy import GRB
 
 os.makedirs("results", exist_ok=True)
 
-# For the one-price scheme, we have: 
+def compute_one_price_profits(q_opt, scenarios):
+    """Return per-scenario profits and expected profit for a fixed one-price offer."""
+    profits = []
+    for scen in scenarios:
+        pi = sum(
+            scen["price"][t] * q_opt[t] + scen["bp"][t] * (scen["wind"][t] - q_opt[t])
+            for t in range(24)
+        )
+        profits.append(pi)
+    exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
+    return profits, exp_profit
+
+
+def compute_two_price_profits(q_opt, scenarios):
+    """Return per-scenario profits and expected profit for a fixed two-price offer."""
+    profits = []
+    for scen in scenarios:
+        pi = 0.0
+        for t in range(24):
+            da = float(scen["price"][t])
+            bp = float(scen["bp"][t])
+            si = int(scen["imbalance"][t])
+            dev = scen["wind"][t] - q_opt[t]
+            pi += da * q_opt[t]
+            if si == 1:
+                pi += da * max(dev, 0) - bp * max(-dev, 0)
+            else:
+                pi += bp * max(dev, 0) - da * max(-dev, 0)
+        profits.append(pi)
+    exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
+    return profits, exp_profit
+
+
+# For the one-price scheme, we have:
 def solve_one_price(scenarios, capacity=500):
     T = 24
     prob = scenarios[0]["prob"]
@@ -29,16 +62,7 @@ def solve_one_price(scenarios, capacity=500):
         raise RuntimeError(f"One-price model not optimal. Status: {m.status}")
 
     q_opt = np.array([q[t].X for t in range(T)])
-
-    profits = []
-    for scen in scenarios:
-        pi = 0
-        for t in range(T):
-            pi += scen["price"][t] * q_opt[t]
-            pi += scen["bp"][t] * (scen["wind"][t] - q_opt[t])
-        profits.append(pi)
-
-    exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
+    profits, exp_profit = compute_one_price_profits(q_opt, scenarios)
     return q_opt, exp_profit, profits
 
 # For the two-price scenario we have: 
@@ -87,26 +111,7 @@ def solve_two_price(scenarios, capacity=500):
         raise RuntimeError(f"Two-price model not optimal. Status: {m.status}")
 
     q_opt = np.array([q[t].X for t in range(T)])
-
-    profits = []
-    for scen in scenarios:
-        pi = 0
-        for t in range(T):
-            da = float(scen["price"][t])
-            bp = float(scen["bp"][t])
-            si = int(scen["imbalance"][t])
-            dev = scen["wind"][t] - q_opt[t]
-
-            pi += da * q_opt[t]
-
-            if si == 1:
-                pi += da * max(dev, 0) - bp * max(-dev, 0)
-            else:
-                pi += bp * max(dev, 0) - da * max(-dev, 0)
-
-        profits.append(pi)
-
-    exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
+    profits, exp_profit = compute_two_price_profits(q_opt, scenarios)
     return q_opt, exp_profit, profits
 def get_wind_stats(scenarios):
     wind_data = np.array([s["wind"] for s in scenarios])
