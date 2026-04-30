@@ -41,7 +41,26 @@ def solve_one_price(scenarios, capacity=500):
     exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
     return q_opt, exp_profit, profits
 
-# For the two-price scenario we have: 
+
+def compute_one_price_profits(q_opt, scenarios):
+    """
+    Evaluate fixed DA offers q_opt on a set of scenarios under the one-price scheme.
+    Returns (profits, expected_profit).
+    """
+    T = 24
+    profits = []
+    for scen in scenarios:
+        pi = 0.0
+        for t in range(T):
+            pi += scen["price"][t] * q_opt[t]
+            pi += scen["bp"][t] * (scen["wind"][t] - q_opt[t])
+        profits.append(pi)
+
+    exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
+    return profits, exp_profit
+
+
+# For the two-price scenario we have:
 def solve_two_price(scenarios, capacity=500):
     T = 24
     S = len(scenarios)
@@ -108,6 +127,36 @@ def solve_two_price(scenarios, capacity=500):
 
     exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
     return q_opt, exp_profit, profits
+
+
+def compute_two_price_profits(q_opt, scenarios):
+    """
+    Evaluate fixed DA offers q_opt on a set of scenarios under the two-price scheme.
+    Returns (profits, expected_profit).
+    """
+    T = 24
+    profits = []
+    for scen in scenarios:
+        pi = 0.0
+        for t in range(T):
+            da = float(scen["price"][t])
+            bp = float(scen["bp"][t])
+            si = int(scen["imbalance"][t])
+            dev = scen["wind"][t] - q_opt[t]
+
+            pi += da * q_opt[t]
+
+            if si == 1:
+                pi += da * max(dev, 0) - bp * max(-dev, 0)
+            else:
+                pi += bp * max(dev, 0) - da * max(-dev, 0)
+
+        profits.append(pi)
+
+    exp_profit = sum(s["prob"] * p for s, p in zip(scenarios, profits))
+    return profits, exp_profit
+
+
 def get_wind_stats(scenarios):
     wind_data = np.array([s["wind"] for s in scenarios])
 
