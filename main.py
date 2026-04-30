@@ -1,6 +1,6 @@
 """Entry point: runs all Step 1 tasks (1.1, 1.2, 1.3)."""
 
-from step1_scenario_generation import dataframe_building, generate_combined_scenarios
+from step1_scenario_generation import dataframe_building, generate_combined_scenarios, plot_scenarios, analyze_scenarios
 from step1_task_1_and_2 import (
     solve_one_price,
     solve_two_price,
@@ -9,7 +9,14 @@ from step1_task_1_and_2 import (
     plot_profit_comparison,
 )
 
-from step1_task_3 import run_cross_validation, plot_cv_per_fold, plot_cv_avg_comparison
+from step1_task_3 import (
+    run_cross_validation,
+    run_cross_validation_vary_is,
+    plot_cv_per_fold,
+    plot_cv_avg_comparison,
+    plot_vary_is_line,
+    plot_vary_is_boxplot,
+)
 
 
 df = dataframe_building(
@@ -23,6 +30,8 @@ df = dataframe_building(
 
 
 scenarios = generate_combined_scenarios(df)
+analyze_scenarios(scenarios)
+plot_scenarios(scenarios)
 
 # ── Tasks 1.1 and 1.2 ────────────────────────────────────────────────────
 q1, ep1, profits1 = solve_one_price(scenarios)
@@ -43,6 +52,6 @@ cv_results = run_cross_validation(scenarios, n_folds=8)
 plot_cv_per_fold(cv_results)
 plot_cv_avg_comparison(cv_results)
 
-vary_results = run_cross_validation_vary_is(all_scenarios)
+vary_results = run_cross_validation_vary_is(scenarios)
 plot_vary_is_line(vary_results)
 plot_vary_is_boxplot(vary_results)

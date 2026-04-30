@@ -11,6 +11,11 @@ Goal        : compare averaged in-sample vs out-of-sample expected profits
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+
+# Format y-axis as thousands (e.g. 350000 → "350")
+_K_FORMATTER = mtick.FuncFormatter(lambda v, _: f"{v / 1000:,.0f}")
+_PROFIT_LABEL = "Expected Profit [k€]"
 
 # Re-use data loading, solvers, and profit helpers from previous tasks
 from step1_scenario_generation import dataframe_building, generate_combined_scenarios
@@ -120,36 +125,51 @@ def run_cross_validation(all_scenarios, n_folds=8):
 
 def run_cross_validation_vary_is(all_scenarios, is_sizes=None, n_folds=8):
     """
-    Run 8-fold cross-validation for different in-sample sizes.
-    Total scenarios stay at 1,600; only the IS/OOS split changes.
-    
+    Block cross-validation across different in-sample sizes.
+
+    Total scenarios stay at 1,600 (IS + OOS = 1600). For each IS size we
+    take n_folds *contiguous* in-sample blocks of length `is_size`, with
+    starting positions spread evenly across [0, N_TOTAL - is_size]. The
+    remaining 1600 − is_size scenarios are used for OOS evaluation. The
+    original ordering of scenarios is preserved (no random shuffling),
+    which respects the time structure of the underlying data.
+
     Returns a dict keyed by IS size, each containing per-fold IS and OOS
     profits for both schemes.
     """
     if is_sizes is None:
-        is_sizes = [25, 50, 100, 200, 400, 600, 800, 1000, 1200, 1400]
+        is_sizes = [200, 400, 600, 800, 1000, 1200, 1400]
 
     N_TOTAL = len(all_scenarios)
     all_results = {}
 
     for is_size in is_sizes:
-        fold_size = is_size // n_folds
-        if fold_size == 0:
-            print(f"Skipping IS={is_size}: too small for {n_folds} folds.")
+        if is_size <= 0 or is_size >= N_TOTAL:
+            print(f"Skipping IS={is_size}: must be in (0, {N_TOTAL}).")
             continue
 
-        n_oos = N_TOTAL - fold_size
+        n_oos     = N_TOTAL - is_size
+        max_start = N_TOTAL - is_size  # inclusive
+
+        # n_folds contiguous IS blocks, evenly spaced across the data.
+        # Blocks may overlap when n_folds * is_size > N_TOTAL — that is fine,
+        # we just want n_folds different windows to average over.
+        if n_folds == 1 or max_start == 0:
+            starts = [0]
+        else:
+            starts = np.linspace(0, max_start, n_folds, dtype=int).tolist()
+
         print(f"\n{'='*60}")
-        print(f"IS size: {is_size} | Fold size: {fold_size} | OOS size: {n_oos}")
+        print(f"IS size: {is_size} | OOS size: {n_oos} | block starts: {starts}")
         print(f"{'='*60}")
 
         is_one, oos_one = [], []
         is_two, oos_two = [], []
 
-        for fold in range(n_folds):
-            start = fold * fold_size
-            end   = start + fold_size
+        for fold, start in enumerate(starts):
+            end = start + is_size
 
+            # Contiguous IS block; everything outside the block is OOS.
             raw_in  = all_scenarios[start:end]
             raw_oos = all_scenarios[:start] + all_scenarios[end:]
 
@@ -166,7 +186,7 @@ def run_cross_validation_vary_is(all_scenarios, is_sizes=None, n_folds=8):
             is_two.append(ep2_is)
             oos_two.append(ep2_oos)
 
-            print(f"  Fold {fold+1}/{n_folds} | "
+            print(f"  Fold {fold+1}/{len(starts)} (start={start:>4}) | "
                   f"1P IS: {ep1_is:>10,.0f} OOS: {ep1_oos:>10,.0f} | "
                   f"2P IS: {ep2_is:>10,.0f} OOS: {ep2_oos:>10,.0f}")
 
@@ -206,8 +226,9 @@ def plot_cv_per_fold(results, n_folds=8):
                 linestyle="--", label="Out-of-sample E[profit]")
         ax.set_title(title)
         ax.set_xlabel("Fold")
-        ax.set_ylabel("Expected Profit (EUR)")
+        ax.set_ylabel(_PROFIT_LABEL)
         ax.set_xticks(folds)
+        ax.yaxis.set_major_formatter(_K_FORMATTER)
         ax.legend()
         ax.grid(alpha=0.3)
 
@@ -247,18 +268,19 @@ def plot_cv_avg_comparison(results):
         edgecolor="black", linewidth=1.2,
     )
 
-    # Annotate each bar with its value
+    # Annotate each bar with its value (in k€)
     for bar in list(bars_is) + list(bars_oos):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + 200,
-            f"{bar.get_height():,.0f}",
+            f"{bar.get_height() / 1000:,.1f}k",
             ha="center", va="bottom", fontsize=8,
         )
 
     ax.set_xticks(x)
     ax.set_xticklabels(["One-price", "Two-price"])
-    ax.set_ylabel("Expected Profit (EUR)")
+    ax.set_ylabel(_PROFIT_LABEL)
+    ax.yaxis.set_major_formatter(_K_FORMATTER)
     ax.set_title(
         "Task 1.3 – Averaged In-sample vs Out-of-sample Expected Profits\n"
         "(8-Fold Cross-Validation)"
@@ -285,19 +307,22 @@ def plot_vary_is_line(all_results):
 
     fig, ax = plt.subplots(figsize=(10, 5))
 
-    ax.plot(is_sizes, avg_is_one,  marker="o", color="steelblue",
-            linewidth=2, label="One-price IS")
-    ax.plot(is_sizes, avg_oos_one, marker="o", color="steelblue",
-            linewidth=2, linestyle="--", label="One-price OOS")
-    ax.plot(is_sizes, avg_is_two,  marker="s", color="darkorange",
-            linewidth=2, label="Two-price IS")
-    ax.plot(is_sizes, avg_oos_two, marker="s", color="darkorange",
-            linewidth=2, linestyle="--", label="Two-price OOS")
+    ax.plot(is_sizes, avg_is_one,  marker="o", markersize=8,
+            color="#1f77b4", linewidth=2.2, label="One-price IS")
+    ax.plot(is_sizes, avg_oos_one, marker="D", markersize=7,
+            color="#1f77b4", markerfacecolor="white", markeredgewidth=1.8,
+            linewidth=2.2, linestyle="--", label="One-price OOS")
+    ax.plot(is_sizes, avg_is_two,  marker="s", markersize=8,
+            color="#d35400", linewidth=2.2, label="Two-price IS")
+    ax.plot(is_sizes, avg_oos_two, marker="^", markersize=8,
+            color="#d35400", markerfacecolor="white", markeredgewidth=1.8,
+            linewidth=2.2, linestyle="--", label="Two-price OOS")
 
     ax.set_xlabel("In-sample size")
-    ax.set_ylabel("Avg Expected Profit (EUR)")
+    ax.set_ylabel("Avg " + _PROFIT_LABEL)
     ax.set_title("Task 1.3 – Avg IS vs OOS Profit across In-sample Sizes\n(8-Fold CV, Total = 1,600 scenarios)")
     ax.set_xticks(is_sizes)
+    ax.yaxis.set_major_formatter(_K_FORMATTER)
     ax.legend()
     ax.grid(alpha=0.3)
     plt.tight_layout()
@@ -333,7 +358,8 @@ def plot_vary_is_boxplot(all_results):
     ax.set_xticks(x)
     ax.set_xticklabels(is_sizes)
     ax.set_xlabel("In-sample size")
-    ax.set_ylabel("OOS Expected Profit (EUR)")
+    ax.set_ylabel("OOS " + _PROFIT_LABEL)
+    ax.yaxis.set_major_formatter(_K_FORMATTER)
     ax.set_title("Task 1.3 – OOS Profit Distribution across In-sample Sizes\n(8-Fold CV, per-fold values)")
     ax.legend([bp1["boxes"][0], bp2["boxes"][0]], ["One-price", "Two-price"])
     ax.grid(axis="y", alpha=0.3)
