@@ -123,85 +123,134 @@ def run_cross_validation(all_scenarios, n_folds=8):
 
     return results
 
-def run_cross_validation_vary_is(all_scenarios, is_sizes=None, n_folds=8):
+
+# ---------------------------------------------------------------------------
+# Vary in-sample size – fixed OOS block
+# ---------------------------------------------------------------------------
+
+def run_vary_is_fixed_oos(all_scenarios, is_sizes=None, n_folds=8,
+                           oos_start=1000):
     """
-    Block cross-validation across different in-sample sizes.
+    Study IS sizes around 200 with 8-fold CV per size, all evaluated on the
+    SAME fixed OOS block so the comparison across IS sizes stays fair.
 
-    Total scenarios stay at 1,600 (IS + OOS = 1600). For each IS size we
-    take n_folds *contiguous* in-sample blocks of length `is_size`, with
-    starting positions spread evenly across [0, N_TOTAL - is_size]. The
-    remaining 1600 − is_size scenarios are used for OOS evaluation. The
-    original ordering of scenarios is preserved (no random shuffling),
-    which respects the time structure of the underlying data.
+    Design
+    ------
+    - Fixed OOS block : all_scenarios[oos_start:]   (default scenarios 1000–1599,
+                        i.e. 600 scenarios — same set is reused for every IS size
+                        and every fold).
+    - IS pool         : all_scenarios[:oos_start]   (default 1000 scenarios — the
+                        only scenarios from which IS folds are sampled).
+    - For each IS size: take `n_folds` *contiguous* IS blocks of length `is_size`,
+                        starting positions spread evenly across the IS pool.
+                        Each block = one fold. Blocks may overlap when
+                        n_folds × is_size > len(IS pool); that is fine — we just
+                        want n_folds different windows to average over.
+    - No shuffling: keeps the time structure of the underlying wind / price data.
 
-    Returns a dict keyed by IS size, each containing per-fold IS and OOS
-    profits for both schemes.
+    Parameters
+    ----------
+    all_scenarios : list of scenario dicts (length 1 600, time-ordered)
+    is_sizes      : IS sizes to test (default [100, 150, 200, 250, 300] —
+                    a window AROUND the original 200 used in the main CV)
+    n_folds       : number of folds per IS size (default 8)
+    oos_start     : index where the fixed OOS block starts (default 1000)
+
+    Returns
+    -------
+    dict with keys
+        "is_sizes": list of IS sizes
+        "n_folds" : int
+        "is_one"  : list (per IS size) of lists (per fold) of IS expected profits
+        "oos_one" : same structure for OOS expected profits, one-price scheme
+        "is_two", "oos_two": same for two-price
     """
     if is_sizes is None:
-        is_sizes = [200, 400, 600, 800, 1000, 1200, 1400]
+        is_sizes = [50, 100, 150, 200, 250, 300, 350, 400]
 
-    N_TOTAL = len(all_scenarios)
-    all_results = {}
+    # Fixed OOS block — same scenarios for every IS size and every fold.
+    fixed_oos  = all_scenarios[oos_start:]
+    out_sample = set_equal_probs(fixed_oos)
+
+    # IS pool — every IS fold is sampled exclusively from here, so OOS and IS
+    # are guaranteed disjoint.
+    is_pool = all_scenarios[:oos_start]
+
+    results = {
+        "is_sizes": is_sizes,
+        "n_folds":  n_folds,
+        "is_one":   [],
+        "oos_one":  [],
+        "is_two":   [],
+        "oos_two":  [],
+    }
+
+    print(f"\nFixed OOS block : scenarios [{oos_start} → {len(all_scenarios)}] "
+          f"({len(fixed_oos)} scenarios)")
+    print(f"IS pool         : scenarios [0 → {oos_start}] ({len(is_pool)} scenarios)")
+    print(f"Folds per size  : {n_folds}")
+    print("=" * 70)
 
     for is_size in is_sizes:
-        if is_size <= 0 or is_size >= N_TOTAL:
-            print(f"Skipping IS={is_size}: must be in (0, {N_TOTAL}).")
+        if is_size > len(is_pool):
+            print(f"Skipping IS={is_size}: bigger than IS pool ({len(is_pool)}).")
             continue
 
-        n_oos     = N_TOTAL - is_size
-        max_start = N_TOTAL - is_size  # inclusive
-
-        # n_folds contiguous IS blocks, evenly spaced across the data.
-        # Blocks may overlap when n_folds * is_size > N_TOTAL — that is fine,
-        # we just want n_folds different windows to average over.
+        # n_folds contiguous IS blocks, starts evenly spread across the IS pool.
+        max_start = len(is_pool) - is_size
         if n_folds == 1 or max_start == 0:
             starts = [0]
         else:
             starts = np.linspace(0, max_start, n_folds, dtype=int).tolist()
 
-        print(f"\n{'='*60}")
-        print(f"IS size: {is_size} | OOS size: {n_oos} | block starts: {starts}")
-        print(f"{'='*60}")
+        is_one_folds,  oos_one_folds = [], []
+        is_two_folds,  oos_two_folds = [], []
 
-        is_one, oos_one = [], []
-        is_two, oos_two = [], []
-
+        print(f"\nIS size = {is_size} | block starts = {starts}")
         for fold, start in enumerate(starts):
-            end = start + is_size
+            end       = start + is_size
+            in_sample = set_equal_probs(is_pool[start:end])
 
-            # Contiguous IS block; everything outside the block is OOS.
-            raw_in  = all_scenarios[start:end]
-            raw_oos = all_scenarios[:start] + all_scenarios[end:]
-
-            in_sample  = set_equal_probs(raw_in)
-            out_sample = set_equal_probs(raw_oos)
-
+            # One-price LP
             q1, ep1_is, _ = solve_one_price(in_sample)
             _, ep1_oos     = compute_one_price_profits(q1, out_sample)
-            is_one.append(ep1_is)
-            oos_one.append(ep1_oos)
 
+            # Two-price MILP
             q2, ep2_is, _ = solve_two_price(in_sample)
             _, ep2_oos     = compute_two_price_profits(q2, out_sample)
-            is_two.append(ep2_is)
-            oos_two.append(ep2_oos)
 
-            print(f"  Fold {fold+1}/{len(starts)} (start={start:>4}) | "
+            is_one_folds.append(ep1_is)
+            oos_one_folds.append(ep1_oos)
+            is_two_folds.append(ep2_is)
+            oos_two_folds.append(ep2_oos)
+
+            print(f"  Fold {fold+1}/{n_folds} (start={start:>3}) | "
                   f"1P IS: {ep1_is:>10,.0f} OOS: {ep1_oos:>10,.0f} | "
                   f"2P IS: {ep2_is:>10,.0f} OOS: {ep2_oos:>10,.0f}")
 
-        all_results[is_size] = {
-            "is_one":  is_one,
-            "oos_one": oos_one,
-            "is_two":  is_two,
-            "oos_two": oos_two,
-        }
+        # Store per-fold lists (one list per IS size).
+        results["is_one"].append(is_one_folds)
+        results["oos_one"].append(oos_one_folds)
+        results["is_two"].append(is_two_folds)
+        results["oos_two"].append(oos_two_folds)
 
-    return all_results
+    # Summary table — average across the n_folds for each IS size.
+    print("\n" + "=" * 75)
+    print(f"{'IS size':<10} {'1P IS μ':>12} {'1P OOS μ':>12} "
+          f"{'2P IS μ':>12} {'2P OOS μ':>12}")
+    print("-" * 75)
+    for i, is_size in enumerate(results["is_sizes"]):
+        print(f"{is_size:<10} "
+              f"{np.mean(results['is_one'][i]):>12,.0f} "
+              f"{np.mean(results['oos_one'][i]):>12,.0f} "
+              f"{np.mean(results['is_two'][i]):>12,.0f} "
+              f"{np.mean(results['oos_two'][i]):>12,.0f}")
 
-    
+    return results
+
+
 # ---------------------------------------------------------------------------
-# Plot functions (callable from main)
+# Plot functions
 # ---------------------------------------------------------------------------
 
 def plot_cv_per_fold(results, n_folds=8):
@@ -292,77 +341,57 @@ def plot_cv_avg_comparison(results):
     plt.show()
 
 
-
-def plot_vary_is_line(all_results):
+def plot_vary_is_fixed_oos(results):
     """
-    Line plot of averaged OOS (and IS) profit vs in-sample size,
-    for both one-price and two-price schemes.
+    Line plot of average IS and OOS profit vs in-sample size for both
+    schemes. Each IS size has n_folds values (from 8-fold CV with the SAME
+    fixed OOS block); we plot only the per-fold mean as a single line.
+
+    A vertical dashed line marks IS=200, the size used in the main CV.
     """
-    is_sizes = sorted(all_results.keys())
+    is_sizes = results["is_sizes"]
+    n_folds  = results.get("n_folds", None)
 
-    avg_is_one  = [np.mean(all_results[k]["is_one"])  for k in is_sizes]
-    avg_oos_one = [np.mean(all_results[k]["oos_one"]) for k in is_sizes]
-    avg_is_two  = [np.mean(all_results[k]["is_two"])  for k in is_sizes]
-    avg_oos_two = [np.mean(all_results[k]["oos_two"]) for k in is_sizes]
+    # Convert per-fold lists to (n_sizes, n_folds) arrays and take the
+    # across-fold mean for each IS size.
+    is_one  = np.array(results["is_one"]).mean(axis=1)
+    oos_one = np.array(results["oos_one"]).mean(axis=1)
+    is_two  = np.array(results["is_two"]).mean(axis=1)
+    oos_two = np.array(results["oos_two"]).mean(axis=1)
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(10, 5.5))
 
-    ax.plot(is_sizes, avg_is_one,  marker="o", markersize=8,
+    # One-price (blue): solid IS, dashed OOS
+    ax.plot(is_sizes, is_one,  marker="o", markersize=8,
             color="#1f77b4", linewidth=2.2, label="One-price IS")
-    ax.plot(is_sizes, avg_oos_one, marker="D", markersize=7,
-            color="#1f77b4", markerfacecolor="white", markeredgewidth=1.8,
-            linewidth=2.2, linestyle="--", label="One-price OOS")
-    ax.plot(is_sizes, avg_is_two,  marker="s", markersize=8,
-            color="#d35400", linewidth=2.2, label="Two-price IS")
-    ax.plot(is_sizes, avg_oos_two, marker="^", markersize=8,
-            color="#d35400", markerfacecolor="white", markeredgewidth=1.8,
-            linewidth=2.2, linestyle="--", label="Two-price OOS")
+    ax.plot(is_sizes, oos_one, marker="D", markersize=8,
+            color="#1f77b4", linewidth=2.2, linestyle="--",
+            markerfacecolor="white", markeredgewidth=1.8,
+            label="One-price OOS")
 
+    # Two-price (orange): solid IS, dashed OOS
+    ax.plot(is_sizes, is_two,  marker="s", markersize=8,
+            color="#d35400", linewidth=2.2, label="Two-price IS")
+    ax.plot(is_sizes, oos_two, marker="^", markersize=8,
+            color="#d35400", linewidth=2.2, linestyle="--",
+            markerfacecolor="white", markeredgewidth=1.8,
+            label="Two-price OOS")
+
+    # Reference line: the IS size used in the main 8-fold CV
+    ax.axvline(x=200, color="gray", linestyle=":", linewidth=1.5,
+               label="Original IS = 200")
+
+    title_folds = f"{n_folds}-fold CV per size" if n_folds else "CV per size"
     ax.set_xlabel("In-sample size")
-    ax.set_ylabel("Avg " + _PROFIT_LABEL)
-    ax.set_title("Task 1.3 – Avg IS vs OOS Profit across In-sample Sizes\n(8-Fold CV, Total = 1,600 scenarios)")
+    ax.set_ylabel(_PROFIT_LABEL)
     ax.set_xticks(is_sizes)
     ax.yaxis.set_major_formatter(_K_FORMATTER)
-    ax.legend()
+    ax.set_title(
+        f"Task 1.3 – Avg IS / OOS Profit vs In-sample Size\n"
+        f"({title_folds}, fixed OOS = scenarios 1000–1600)"
+    )
+    ax.legend(fontsize=9, loc="best")
     ax.grid(alpha=0.3)
     plt.tight_layout()
-    plt.savefig("results/task_1_3_vary_is_line.png", dpi=150)
-    plt.show()
-
-
-def plot_vary_is_boxplot(all_results):
-    """
-    Box plot of per-fold OOS profits across in-sample sizes,
-    for both one-price and two-price schemes side by side.
-    """
-    is_sizes = sorted(all_results.keys())
-
-    oos_one_data = [all_results[k]["oos_one"] for k in is_sizes]
-    oos_two_data = [all_results[k]["oos_two"] for k in is_sizes]
-
-    x = np.arange(len(is_sizes))
-    width = 0.3
-
-    fig, ax = plt.subplots(figsize=(12, 5))
-
-    bp1 = ax.boxplot(oos_one_data, positions=x - width/2, widths=0.25,
-                     patch_artist=True,
-                     boxprops=dict(facecolor="steelblue", alpha=0.7),
-                     medianprops=dict(color="black", linewidth=2))
-
-    bp2 = ax.boxplot(oos_two_data, positions=x + width/2, widths=0.25,
-                     patch_artist=True,
-                     boxprops=dict(facecolor="darkorange", alpha=0.7),
-                     medianprops=dict(color="black", linewidth=2))
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(is_sizes)
-    ax.set_xlabel("In-sample size")
-    ax.set_ylabel("OOS " + _PROFIT_LABEL)
-    ax.yaxis.set_major_formatter(_K_FORMATTER)
-    ax.set_title("Task 1.3 – OOS Profit Distribution across In-sample Sizes\n(8-Fold CV, per-fold values)")
-    ax.legend([bp1["boxes"][0], bp2["boxes"][0]], ["One-price", "Two-price"])
-    ax.grid(axis="y", alpha=0.3)
-    plt.tight_layout()
-    plt.savefig("results/task_1_3_vary_is_boxplot.png", dpi=150)
+    plt.savefig("results/task_1_3_vary_is_fixed_oos.png", dpi=150)
     plt.show()

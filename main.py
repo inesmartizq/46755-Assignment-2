@@ -11,11 +11,10 @@ from step1_task_1_and_2 import (
 
 from step1_task_3 import (
     run_cross_validation,
-    run_cross_validation_vary_is,
+    run_vary_is_fixed_oos,
     plot_cv_per_fold,
     plot_cv_avg_comparison,
-    plot_vary_is_line,
-    plot_vary_is_boxplot,
+    plot_vary_is_fixed_oos,
 )
 
 from step1_task_4 import (
@@ -61,9 +60,14 @@ cv_results = run_cross_validation(scenarios, n_folds=8)
 plot_cv_per_fold(cv_results)
 plot_cv_avg_comparison(cv_results)
 
-vary_results = run_cross_validation_vary_is(scenarios)
-plot_vary_is_line(vary_results)
-plot_vary_is_boxplot(vary_results)
+# IS sizes from 50 to 400 with 8-fold CV per size, evaluated on the same
+# fixed OOS block (scenarios 1000–1600).
+vary_results = run_vary_is_fixed_oos(
+    scenarios,
+    is_sizes=[50, 100, 150, 200, 250, 300, 350, 400],
+    n_folds=8,
+)
+plot_vary_is_fixed_oos(vary_results)
 
 # ── Task 1.4 – Risk-averse offering (CVaR) ───────────────────────────────
 # 1) Build the efficient frontier on the full 1,600-scenario set for both
