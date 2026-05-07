@@ -96,5 +96,5 @@ if __name__ == "__main__":
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     
     plt.tight_layout()
-    plt.savefig("data/task2_2_comparison.png")
+    plt.savefig("results/task2_2_comparison.png")
     plt.show()

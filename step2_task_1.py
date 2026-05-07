@@ -3,43 +3,42 @@ import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 
-# =========================================================
-# PARAMETERS
-# =========================================================
-MIN_LOAD = 220              # kW [cite: 75]
-EPSILON = 0.10              # P90 requirement (1 - 0.90) [cite: 81, 82]
-BIG_M = 10000               # Big-M for ALSO-X
-NUM_MINUTES = 60            # Minute-level resolution [cite: 72]
 
-# =========================================================
+# PARAMETERS
+
+MIN_LOAD = 220              # kW 
+EPSILON = 0.10              # P90 requirement 
+BIG_M = 10000               # Big-M for ALSO-X
+NUM_MINUTES = 60            # Minute-level resolution 
+
+
 # DATA LOADING & PRE-PROCESSING
-# =========================================================
+
 
 def load_in_sample_profiles():
     """
-    Load the 100 in-sample profiles[cite: 78].
+    Load the 100 in-sample profiles.
     Shape: (100 scenarios, 60 minutes)
     """
-    # Assuming CSV structure from context
     df = pd.read_csv("data/in_sample_profiles.csv")
     return df.values
 
 def compute_flexibility(profiles):
     """
-    For FCR-D UP, reserve is provided by reducing consumption[cite: 71].
-    available reserve = current load - minimum technical load[cite: 71, 75].
+    For FCR-D UP, reserve is provided by reducing consumption.
+    Available reserve = current load - minimum technical load.
     """
     flexibility = profiles - MIN_LOAD
     return flexibility
 
-# =========================================================
+
 # OPTIMIZATION MODELS
-# =========================================================
+
 
 def solve_alsox(flexibility, epsilon=EPSILON):
     """
-    ALSO-X sample-based MILP formulation[cite: 83].
-    Determines the optimal FCR-D UP reserve bid (kW) satisfying P90[cite: 82].
+    ALSO-X sample-based MILP formulation.
+    Determines the optimal FCR-D UP reserve bid (kW) satisfying P90.
     """
     W, M = flexibility.shape
     model = gp.Model("Task2_1_ALSOX")
@@ -103,24 +102,24 @@ def solve_cvar(flexibility, epsilon=EPSILON):
     model.optimize()
     return R.X
 
-# =========================================================
+
 # MAIN EXECUTION
-# =========================================================
+
 
 if __name__ == "__main__":
     print("--- STEP 2: TASK 2.1 (In-sample Decision Making) ---")
 
-    # 1. Load and process in-sample data (100 profiles) [cite: 78]
+    # Load and process in-sample data (100 profiles) 
     try:
         in_profiles = load_in_sample_profiles()
         in_flex = compute_flexibility(in_profiles)
         print(f"Loaded {in_profiles.shape[0]} profiles with {in_profiles.shape[1]} minutes each.")
 
-        # 2. Solve using ALSO-X [cite: 83]
+        # Solve using ALSO-X 
         res_alsox = solve_alsox(in_flex)
         print(f"ALSO-X Optimal Reserve Bid: {res_alsox:.2f} kW")
 
-        # 3. Solve using CVaR [cite: 83]
+        # Solve using CVaR 
         res_cvar = solve_cvar(in_flex)
         print(f"CVaR Optimal Reserve Bid:    {res_cvar:.2f} kW")
 
