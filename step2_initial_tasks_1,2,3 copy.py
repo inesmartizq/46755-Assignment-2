@@ -597,3 +597,161 @@ if __name__ == "__main__":
 
 
 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import gurobipy as gp
+from gurobipy import GRB
+
+# =========================================================
+# PARAMETERS (Task 2.1 specific)
+# =========================================================
+MIN_LOAD = 220              # kW [cite: 75]
+EPSILON = 0.10              # P90 requirement (1 - 0.90) [cite: 82]
+BIG_M = 10000               # Big-M for ALSO-X MILP
+NUM_MINUTES = 60            # Hourly bids with minute resolution [cite: 70, 72]
+
+# =========================================================
+# DATA LOADING & PRE-PROCESSING
+# =========================================================
+
+def load_in_sample_profiles():
+    """
+    Load the 100 in-sample profiles [cite: 78]
+    Expected Shape: (100 scenarios, 60 minutes)
+    """
+    # Assuming the same naming convention as your previous snippet
+    df = pd.read_csv("data/in_sample_profiles.csv")
+    return df.values
+
+def compute_flexibility(profiles):
+    """
+    For FCR-D UP, reserve is provided by reducing consumption[cite: 71].
+    Available reserve = current load - minimum technical load[cite: 69, 75].
+    """
+    flexibility = profiles - MIN_LOAD
+    return flexibility
+
+# =========================================================
+# OPTIMIZATION MODELS
+# =========================================================
+
+def solve_alsox(flexibility, epsilon=EPSILON):
+    """
+    ALSO-X sample-based MILP formulation[cite: 83].
+    Determines the reserve bid R such that violations 
+    do not exceed the epsilon budget.
+    """
+    W, M = flexibility.shape
+    model = gp.Model("Task2_1_ALSOX")
+    model.setParam("OutputFlag", 0)
+
+    # Decision variable: Reserve Bid (kW)
+    R = model.addVar(lb=0, name="ReserveBid")
+
+    # Binary violation variables: 1 if bid cannot be met
+    y = model.addVars(W, M, vtype=GRB.BINARY, name="Violation")
+
+    # Objective: Maximize the reserve bid R
+    model.setObjective(R, GRB.MAXIMIZE)
+
+    # Constraints: R <= flexibility + BigM * y
+    for w in range(W):
+        for m in range(M):
+            model.addConstr(
+                R <= flexibility[w, m] + BIG_M * y[w, m],
+                name=f"BigM_{w}_{m}"
+            )
+
+    # P90 violation budget constraint [cite: 82]
+    model.addConstr(
+        gp.quicksum(y[w, m] for w in range(W) for m in range(M))
+        <= epsilon * W * M,
+        name="P90_budget"
+    )
+
+    model.optimize()
+    return R.X
+
+def solve_cvar(flexibility, epsilon=EPSILON):
+    """
+    CVaR approximation (LP)[cite: 83].
+    Provides a more conservative linear alternative to ALSO-X.
+    """
+    W, M = flexibility.shape
+    N = W * M
+    model = gp.Model("Task2_1_CVaR")
+    model.setParam("OutputFlag", 0)
+
+    R = model.addVar(lb=0, name="ReserveBid")
+    beta = model.addVar(lb=-GRB.INFINITY, name="Beta")
+    z = model.addVars(W, M, lb=0, name="Slack")
+
+    model.setObjective(R, GRB.MAXIMIZE)
+
+    for w in range(W):
+        for m in range(M):
+            shortfall = R - flexibility[w, m]
+            model.addConstr(z[w, m] >= shortfall - beta)
+
+    # CVaR constraint representing the P90 tail [cite: 82, 83]
+    model.addConstr(
+        beta + (1 / (epsilon * N)) * gp.quicksum(z[w, m] for w in range(W) for m in range(M))
+        <= 0
+    )
+
+    model.optimize()
+    return R.X
+
+# =========================================================
+# VISUALIZATION
+# =========================================================
+
+def plot_task_21(flexibility, reserve_alsox, reserve_cvar):
+    """
+    Visualizes the flexibility distribution and the resulting bids.
+    """
+    flat_flex_sorted = np.sort(flexibility.flatten())
+    p = np.linspace(0, 1, len(flat_flex_sorted))
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(flat_flex_sorted, p, label='In-sample Flexibility (CDF)', color='black', linewidth=2)
+    
+    plt.axvline(x=reserve_alsox, color='blue', linestyle='--', label=f'ALSO-X Bid: {reserve_alsox:.2f} kW')
+    plt.axvline(x=reserve_cvar, color='red', linestyle='--', label=f'CVaR Bid: {reserve_cvar:.2f} kW')
+    
+    # P90 threshold (10% violation)
+    plt.axhline(y=0.10, color='gray', linestyle=':', label='10% Violation Threshold (P90)')
+
+    plt.title('Task 2.1: Reserve Bid Comparison (In-Sample)')
+    plt.xlabel('Available Upward Flexibility (kW)')
+    plt.ylabel('Cumulative Probability')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+# =========================================================
+# MAIN EXECUTION
+# =========================================================
+
+if __name__ == "__main__":
+    print("--- STEP 2: TASK 2.1 (In-sample Decision Making) ---")
+
+    # 1. Prepare Data
+    in_profiles = load_in_sample_profiles()
+    in_flex = compute_flexibility(in_profiles)
+
+    # 2. Solve ALSO-X
+    res_alsox = solve_alsox(in_flex)
+    print(f"ALSO-X Optimal Reserve Bid: {res_alsox:.2f} kW")
+
+    # 3. Solve CVaR
+    res_cvar = solve_cvar(in_flex)
+    print(f"CVaR Optimal Reserve Bid:    {res_cvar:.2f} kW")
+
+    # 4. Compare and Visualize
+    print("\nComparison:")
+    if res_cvar <= res_alsox:
+        print("CVaR is more conservative than ALSO-X (as expected).")
+    
+    plot_task_21(in_flex, res_alsox, res_cvar)
