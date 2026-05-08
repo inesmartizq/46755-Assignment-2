@@ -285,7 +285,7 @@ def plot_cv_per_fold(results, n_folds=8):
                  fontsize=13, fontweight="bold")
     plt.tight_layout()
     plt.savefig("results/task_1_3_per_fold.png", dpi=150)
-    plt.show()
+    #plt.show()
 
 
 def plot_cv_avg_comparison(results):
@@ -338,7 +338,7 @@ def plot_cv_avg_comparison(results):
     ax.grid(axis="y", alpha=0.3)
     plt.tight_layout()
     plt.savefig("results/task_1_3_avg_comparison.png", dpi=150)
-    plt.show()
+    #plt.show()
 
 
 def plot_vary_is_fixed_oos(results):
@@ -394,4 +394,4 @@ def plot_vary_is_fixed_oos(results):
     ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig("results/task_1_3_vary_is_fixed_oos.png", dpi=150)
-    plt.show()
+    #plt.show()
