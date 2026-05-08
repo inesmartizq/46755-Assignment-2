@@ -186,8 +186,8 @@ def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label,
     plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"results/{task_name.lower().replace('.', '').replace(' ', '')}_da_offers.png", dpi=150)
-    plt.show()
+    plt.savefig(f"results/{task_name.lower().replace(' ', '_').replace('.', '_')}_da_offers.png", dpi=150)
+    #plt.show()
 
     sorted_profits = np.sort(profits)
     cumulative_profit = np.cumsum(sorted_profits)
@@ -210,8 +210,8 @@ def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label,
     axes[1].grid(alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(f"results/{task_name.lower().replace('.', '').replace(' ', '')}_profit_analysis.png", dpi=150)
-    plt.show()
+    plt.savefig(f"results/{task_name.lower().replace(' ', '_').replace('.', '_')}_profit_analysis.png", dpi=150)
+    #plt.show()
 
 
 def plot_offer_comparison(q1, q2, scenarios):
@@ -235,7 +235,7 @@ def plot_offer_comparison(q1, q2, scenarios):
     plt.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig("results/da_offers_comparison.png", dpi=150)
-    plt.show()
+    #plt.show()
     
 def plot_profit_comparison(profits1, profits2):
     sorted_1 = np.sort(profits1)
@@ -270,4 +270,4 @@ def plot_profit_comparison(profits1, profits2):
 
     plt.tight_layout()
     plt.savefig("results/profit_comparison.png", dpi=150)
-    plt.show()
+    #plt.show()

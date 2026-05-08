@@ -346,7 +346,7 @@ def plot_efficient_frontier(sweep_one, sweep_two):
     ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig("results/task_1_4_frontier.png", dpi=150)
-    plt.show()
+    #plt.show()
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ def plot_offers_vs_beta(sweep):
     )
     plt.tight_layout()
     plt.savefig(f"results/task_1_4_offers_beta_{sweep['scheme']}.png", dpi=150)
-    plt.show()
+    #plt.show()
 
 
 # ---------------------------------------------------------------------------
@@ -451,7 +451,7 @@ def plot_profit_distributions(sweep, betas_to_show=None):
     ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig(f"results/task_1_4_distributions_{sweep['scheme']}.png", dpi=150)
-    plt.show()
+    #plt.show()
 
 
 # ---------------------------------------------------------------------------
@@ -489,4 +489,4 @@ def plot_sensitivity_frontiers(sensitivity_results, scheme_label):
     plt.tight_layout()
     fname = f"results/task_1_4_sensitivity_{scheme_label.split('-')[0].strip().lower()}.png"
     plt.savefig(fname, dpi=150)
-    plt.show()
+    #plt.show()
