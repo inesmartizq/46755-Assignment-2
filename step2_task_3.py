@@ -80,7 +80,7 @@ def run_sensitivity_analysis(in_flex, out_flex, p_levels=None):
 
     Saves
     -----
-    results/task2_3_tradeoff.png
+    results/task_2_3_tradeoff.png
     """
     if p_levels is None:
         p_levels = P_LEVELS
@@ -96,7 +96,7 @@ def run_sensitivity_analysis(in_flex, out_flex, p_levels=None):
     df = pd.DataFrame(results, columns=["P_requirement", "Reserve_Bid_kW",
                                          "Expected_Shortfall_kW"])
 
-    #_plot_sensitivity(df)
+    _plot_sensitivity(df)
     return df
 
 

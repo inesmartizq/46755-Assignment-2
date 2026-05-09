@@ -29,14 +29,14 @@ from step1_task_3 import (
     plot_cv_avg_comparison,
     plot_vary_is_fixed_oos,
 )
+
 from step1_task_4 import (
-    sweep_beta,
-    assess_in_sample_sensitivity,
-    plot_efficient_frontier,
-    plot_offers_vs_beta,
-    plot_profit_distributions,
-    plot_sensitivity_frontiers,
+    set_equal_probs, 
+    sweep_beta, 
+    plot_dashboard1, 
+    plot_dashboard2,
 )
+
 
 # ── Step 2 imports ────────────────────────────────────────────────────────
 
@@ -106,20 +106,11 @@ plot_vary_is_fixed_oos(vary_results)
 
 # ── Task 1.4 – Risk-averse offering (CVaR) ───────────────────────────────
 
-sweep_one = sweep_beta(scenarios, scheme="one", alpha=0.90)
-sweep_two = sweep_beta(scenarios, scheme="two", alpha=0.90)
-
-plot_efficient_frontier(sweep_one, sweep_two)
-plot_offers_vs_beta(sweep_one)
-plot_offers_vs_beta(sweep_two)
-plot_profit_distributions(sweep_one)
-plot_profit_distributions(sweep_two)
-
-subsets = [scenarios[0:200], scenarios[700:900], scenarios[1400:1600]]
-sens_one = assess_in_sample_sensitivity(subsets, scheme="one", alpha=0.90)
-sens_two = assess_in_sample_sensitivity(subsets, scheme="two", alpha=0.90)
-plot_sensitivity_frontiers(sens_one, "One-price")
-plot_sensitivity_frontiers(sens_two, "Two-price")
+scenarios_eq = set_equal_probs(scenarios)
+results_one  = sweep_beta(scenarios_eq, scheme="one")
+results_two  = sweep_beta(scenarios_eq, scheme="two")
+plot_dashboard1(results_one, results_two)
+plot_dashboard2(scenarios_eq, n_subsets=3, subset_size=200)
 
 
 # =========================================================================
