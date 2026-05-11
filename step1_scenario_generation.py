@@ -4,6 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from itertools import product as cartesian_product
 
+plt.rcParams.update({
+    "axes.titlesize": 21,
+    "figure.titlesize": 27,
+    "axes.labelsize": 15,
+    "xtick.labelsize": 15,
+    "ytick.labelsize": 15,
+    "legend.fontsize": 15,
+})
+
 def read_csv(filename):
     df = pd.read_csv(filename)
     return df
@@ -122,7 +131,7 @@ def plot_scenarios(scenarios, n_sample=1600, seed=0, save_path="results/scenario
     ax.set_xlabel("Hour"); ax.set_ylabel("Fraction of scenarios")
     ax.legend(); ax.grid(alpha=0.3, axis="y")
 
-    fig.suptitle(f"Scenario overview ({len(scenarios)} total scenarios)", fontsize=13, y=1.00)
+    fig.suptitle(f"Scenario overview ({len(scenarios)} total scenarios)", fontsize=27, y=1.00)
     fig.tight_layout()
     fig.savefig(save_path, dpi=150, bbox_inches="tight")
     plt.show()

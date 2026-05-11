@@ -13,6 +13,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 
+plt.rcParams.update({
+    "axes.titlesize": 21,
+    "figure.titlesize": 27,
+    "axes.labelsize": 15,
+    "xtick.labelsize": 15,
+    "ytick.labelsize": 15,
+    "legend.fontsize": 15,
+})
+
 # Format y-axis as thousands (e.g. 350000 → "350")
 _K_FORMATTER = mtick.FuncFormatter(lambda v, _: f"{v / 1000:,.0f}")
 _PROFIT_LABEL = "Expected Profit [k€]"
@@ -281,8 +290,8 @@ def plot_cv_per_fold(results, n_folds=8):
         ax.legend()
         ax.grid(alpha=0.3)
 
-    plt.suptitle("Task 1.3 – Per-fold In-sample vs Out-of-sample Expected Profits",
-                 fontsize=13, fontweight="bold")
+    plt.suptitle("Per-fold In-sample vs Out-of-sample Expected Profits",
+                 fontsize=26)
     plt.tight_layout()
     plt.savefig("results/task_1_3_per_fold.png", dpi=150)
     #plt.show()
@@ -331,7 +340,7 @@ def plot_cv_avg_comparison(results):
     ax.set_ylabel(_PROFIT_LABEL)
     ax.yaxis.set_major_formatter(_K_FORMATTER)
     ax.set_title(
-        "Task 1.3 – Averaged In-sample vs Out-of-sample Expected Profits\n"
+        "Averaged In-sample vs Out-of-sample Expected Profits\n"
         "(8-Fold Cross-Validation)"
     )
     ax.legend()
@@ -387,10 +396,10 @@ def plot_vary_is_fixed_oos(results):
     ax.set_xticks(is_sizes)
     ax.yaxis.set_major_formatter(_K_FORMATTER)
     ax.set_title(
-        f"Task 1.3 – Avg IS / OOS Profit vs In-sample Size\n"
+        f"Avg IS / OOS Profit vs In-sample Size\n"
         f"({title_folds}, fixed OOS = scenarios 1000–1600)"
     )
-    ax.legend(fontsize=9, loc="best")
+    ax.legend(fontsize=15, loc="best")
     ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig("results/task_1_3_vary_is_fixed_oos.png", dpi=150)

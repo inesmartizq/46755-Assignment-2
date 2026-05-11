@@ -4,6 +4,15 @@ import matplotlib.pyplot as plt
 import gurobipy as gp
 from gurobipy import GRB
 
+plt.rcParams.update({
+    "axes.titlesize": 21,
+    "figure.titlesize": 27,
+    "axes.labelsize": 15,
+    "xtick.labelsize": 15,
+    "ytick.labelsize": 15,
+    "legend.fontsize": 15,
+})
+
 os.makedirs("results", exist_ok=True)
 
 # For the one-price scheme, we have: 
@@ -182,7 +191,7 @@ def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label,
 
     plt.xlabel("Hour")
     plt.ylabel("MW")
-    plt.title(f"{task_name} - Optimal DA Offers")
+    plt.title("Optimal DA Offers")
     plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
@@ -197,14 +206,14 @@ def plot_task_results(q, profits, exp_profit, scenarios, task_name, offer_label,
     axes[0].hist(profits, bins=50, color=color, edgecolor="white", alpha=0.85)
     axes[0].axvline(exp_profit, color="red", linestyle="--", linewidth=2,
                     label=f"E[profit] = {exp_profit:,.0f} EUR")
-    axes[0].set_title(f"{task_name} - Profit Distribution")
+    axes[0].set_title("Profit Distribution")
     axes[0].set_xlabel("Profit (EUR)")
     axes[0].set_ylabel("Number of scenarios")
     axes[0].legend()
     axes[0].grid(alpha=0.3)
 
     axes[1].plot(np.arange(1, len(sorted_profits) + 1), cumulative_profit, color=color, linewidth=1.8)
-    axes[1].set_title(f"{task_name} - Cumulative Profit")
+    axes[1].set_title("Cumulative Profit")
     axes[1].set_xlabel("Scenario")
     axes[1].set_ylabel("Cumulative Profit (EUR)")
     axes[1].grid(alpha=0.3)

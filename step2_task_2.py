@@ -10,6 +10,15 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+plt.rcParams.update({
+    "axes.titlesize": 21,
+    "figure.titlesize": 27,
+    "axes.labelsize": 15,
+    "xtick.labelsize": 15,
+    "ytick.labelsize": 15,
+    "legend.fontsize": 15,
+})
+
 os.makedirs("results", exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -99,7 +108,7 @@ def plot_shortfall_comparison(sf_alsox, sf_cvar):
             color="darkorange", alpha=0.6, edgecolor="black",
             label="CVaR shortfalls")
 
-    ax.set_title("Task 2.2 – Out-of-Sample Shortfall Magnitude Comparison")
+    ax.set_title("Out-of-Sample Shortfall Magnitude Comparison")
     ax.set_xlabel("Shortfall Magnitude [kW]")
     ax.set_ylabel("Frequency [minutes]")
     ax.legend()

@@ -13,6 +13,15 @@ import matplotlib.pyplot as plt
 import gurobipy as gp
 from gurobipy import GRB
 
+plt.rcParams.update({
+    "axes.titlesize": 21,
+    "figure.titlesize": 27,
+    "axes.labelsize": 15,
+    "xtick.labelsize": 15,
+    "ytick.labelsize": 15,
+    "legend.fontsize": 15,
+})
+
 os.makedirs("results", exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -131,7 +140,7 @@ def _plot_sensitivity(df):
     ax1.legend(lns, labs, loc="upper center",
                bbox_to_anchor=(0.5, -0.13), ncol=2)
 
-    plt.title("Task 2.3 – Reliability vs. Capacity Provision Trade-off")
+    plt.title("Reliability vs. Capacity Provision Trade-off")
     plt.tight_layout()
     plt.savefig("results/task_2_3_tradeoff.png", dpi=150, bbox_inches="tight")
     plt.show()
